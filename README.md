@@ -1,5 +1,7 @@
 # Scalable System — Node.js + Nginx + MySQL Master-Slave
 
+Repo link: [https://github.com/vantran7878/Scalable-system.git](https://github.com/vantran7878/Scalable-system.git)
+
 ## Architecture
 
 ```
