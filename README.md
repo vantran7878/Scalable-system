@@ -2,6 +2,8 @@
 
 Repo link: [https://github.com/vantran7878/Scalable-system.git](https://github.com/vantran7878/Scalable-system.git)
 
+Video link: [Here](https://youtu.be/8uabvUyz3es)
+
 ## Architecture
 
 ```
