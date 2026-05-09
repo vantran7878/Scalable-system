@@ -1,0 +1,115 @@
+version: "3.8"
+
+services:
+  # ─── Database: Master (Writes) ───────────────────────────────────────────
+  mysql_master:
+    image: mysql:8.0
+    container_name: mysql_master
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: productsdb
+      MYSQL_USER: appuser
+      MYSQL_PASSWORD: apppassword
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./mysql/master/my.cnf:/etc/mysql/conf.d/my.cnf
+      - ./mysql/master/init:/docker-entrypoint-initdb.d
+      - master_data:/var/lib/mysql
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ─── Database: Slave (Reads) ─────────────────────────────────────────────
+  mysql_slave:
+    image: mysql:8.0
+    container_name: mysql_slave
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+    ports:
+      - "3307:3306"
+    volumes:
+      - ./mysql/slave/my.cnf:/etc/mysql/conf.d/my.cnf
+      - ./mysql/slave/init:/docker-entrypoint-initdb.d
+      - slave_data:/var/lib/mysql
+    depends_on:
+      mysql_master:
+        condition: service_healthy
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ─── API Node A ──────────────────────────────────────────────────────────
+  node_a:
+    build: ./api
+    container_name: node_a
+    environment:
+      NODE_ID: Node_A
+      DB_MASTER_HOST: mysql_master
+      DB_SLAVE_HOST: mysql_slave
+      DB_USER: appuser
+      DB_PASSWORD: apppassword
+      DB_NAME: productsdb
+      PORT: 3000
+    depends_on:
+      mysql_master:
+        condition: service_healthy
+      mysql_slave:
+        condition: service_healthy
+    networks:
+      - app_network
+    restart: unless-stopped
+
+  # ─── API Node B ──────────────────────────────────────────────────────────
+  node_b:
+    build: ./api
+    container_name: node_b
+    environment:
+      NODE_ID: Node_B
+      DB_MASTER_HOST: mysql_master
+      DB_SLAVE_HOST: mysql_slave
+      DB_USER: appuser
+      DB_PASSWORD: apppassword
+      DB_NAME: productsdb
+      PORT: 3000
+    depends_on:
+      mysql_master:
+        condition: service_healthy
+      mysql_slave:
+        condition: service_healthy
+    networks:
+      - app_network
+    restart: unless-stopped
+
+  # ─── Nginx Load Balancer ─────────────────────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: nginx_lb
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - node_a
+      - node_b
+    networks:
+      - app_network
+    restart: unless-stopped
+
+networks:
+  app_network:
+    driver: bridge
+
+volumes:
+  master_data:
+  slave_data:
